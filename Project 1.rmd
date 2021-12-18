@@ -1,0 +1,156 @@
+---
+title: "DDS Project 1"
+author: "CDHolmes"
+date: "12/15/2021"
+output: html_document
+---
+
+# Libraries
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(magrittr)
+library(maps)
+library(dplyr)
+library(rvest)
+library(xml2)
+library(robotstxt)
+```
+
+```{r}
+# Variables
+beers <- read.csv(file.choose(), header = TRUE)
+breweries <- read.csv(file.choose(), header = TRUE)
+mapdata <- map_data("state")
+
+## Add state abbreviation to mapdata
+mapdata$State <-
+    state.abb[match(mapdata$region, str_to_lower(state.name))]
+mapdata[400,]
+
+# Explore Datasets
+head(beers)
+head(breweries)
+head(mapdata)
+
+dim(beers)
+dim(breweries)
+
+# Merge Datasets
+brew_beers <-
+    left_join(beers, breweries, by = c("Brewery_id" = "Brew_ID")) %>%
+    select(Name.x, Beer_ID, ABV, IBU, Brewery_id, Style, Ounces, Name.y, City,
+        State) %>%
+    rename("Beer Name" = "Name.x") %>%
+    rename("Brewery Name" =  "Name.y")
+
+colSums(is.na(brew_beers) | brew_beers == "")
+
+head(brew_beers)
+dim(brew_beers)
+
+
+brew_beers_summary <- brew_beers %>%
+    group_by(State) %>%
+    summarize(count = n()) %>%
+    as.data.frame()
+brew_beers_summary$State <- str_remove_all(brew_beers_summary$State, " ")
+head(brew_beers_summary)
+
+
+map_brews <- left_join(mapdata, brew_beers_summary)
+head(map_brews)
+map_brews[5000,]
+
+
+# Map of Breweries by State
+map_brews %>%
+    ggplot(aes(long, lat, group = subregion)) +
+    geom_map(
+        aes(map_id = region),
+        map = mapdata,
+        color = "gray80", fill = "gray 30", size = 0.3
+    ) +
+    coord_map("ortho", orientation = c(39, -98, 0)) +
+    geom_polygon(aes(group = group, fill = count), color = "black") +
+    theme_minimal()
+
+# ABV & IBU relationship
+brew_beers %>%
+    filter(!is.na(ABV) | !is.na(ABV)) %>%
+    ggplot(aes(x = ABV, y = IBU)) +
+    geom_point() +
+    geom_smooth()
+
+brew_beers %>%
+    filter(!is.na(ABV) | !is.na(ABV)) %>%
+    filter(between(ABV, .05, .067)) %>%
+    ggplot(aes(x = ABV, y = IBU)) +
+    geom_point() +
+    geom_smooth()
+
+# Bar Chart of Breweries by State
+brew_beers_summary %>%
+    ggplot(aes(x = reorder(State, -count), y = count, fill = State)) +
+    geom_bar(stat = "identity")
+
+## Ruberic
+# Max ABV State
+brew_beers %>%
+    group_by(State) %>%
+    filter(!is.na(ABV)) %>%
+    summarize(max_abv = max(ABV)) %>%
+    slice_max(max_abv, n = 1)
+
+# Max IBU State
+brew_beers %>%
+    group_by(State) %>%
+    filter(!is.na(IBU)) %>%
+    summarize(max_ibu = max(IBU)) %>%
+    slice_max(max_ibu, n = 1)
+
+# Summary ABV
+summary(brew_beers$ABV * 100)
+
+brew_beers %>%
+    ggplot(aes(y = ABV)) +
+    geom_boxplot()
+
+
+
+
+# Highest ABV Beers
+# Breweries with highest ABV
+# Beer Advocate Styles
+beer_advocate_styles <- "https://www.beeradvocate.com/beer/styles/"
+## Check scraping permissions
+paths_allowed(paths = c(beer_advocate_styles))
+
+# Return Data
+beer_advocate <- read_html(beer_advocate_styles)
+beer_advocate
+flat_html <- readLines(beer_advocate_styles)
+
+
+styles <- beer_advocate %>%
+    html_nodes("#ba-content b") %>%
+    html_text()
+str(styles)
+length(styles)
+
+styles %>% html_nodes(".stylebreak li") %>% html_text()
+
+
+body_nodes2 <- beer_advocate %>%
+    html_nodes(".stylebreak li") %>%
+    html_text()
+body_nodes2
+str(body_nodes2)
+
+str(body_nodes)
+body_nodes2[2]
+
+
+body_nodes %>%
+    html_children()
+```
