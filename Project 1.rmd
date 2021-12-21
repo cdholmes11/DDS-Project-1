@@ -68,6 +68,9 @@ brew_beers_new <-
     )
 head(brew_beers_new)
 view(brew_beers_new)
+
+brew_beers_new$stand_style_count <- scale(length(brew_beers_new$style_strict))
+
 ## Checking for major styles still in "Other"
 brew_beers_new %>%
     group_by(style_strict) %>%
@@ -375,28 +378,8 @@ brew_beers_new %>%
     group_by(style_strict) %>%
     summarize(count = n())
 
-## Top n Cities ranked by Brewery count
-top_city <- brew_beers_new %>%
-    group_by(City, brewery_name) %>%
-    summarize(count = n())
 
-sorted_group2 <- top_city[order(top_city$City, -top_city$count), ]
-top_city_by_brewery <- sorted_group2[!duplicated(sorted_group2$City), ]
-
-t <- brew_beers_new %>%
-    group_by(City, brewery_name) %>%
-    summarize(count = n()) %>%
-    select(City, count) %>%
-    slice_max(count, n = 20) %>%
-    ggplot(aes(x = reorder(City, -count), y = count, fill = City)) +
-    geom_bar(stat = "identity") +
-    xlab("City") +
-    ylab("Brewery Count") +
-    ggtitle("Cities with most Breweries") +
-    theme_minimal() +
-    theme(legend.position = "none")
-
-
+# Utah IBU vs. ABV scatter plot
 brew_beers_new %>%
     filter(!is.na(ABV) & !is.na(IBU) & State == " UT") %>%
     ggplot(aes(x = IBU, y = ABV)) +
@@ -405,6 +388,83 @@ brew_beers_new %>%
     xlab("IBU") +
     ylab("ABV") +
     ggtitle("Utah - IBU vs. ABV") +
+    theme_minimal()
+
+# Ale/Stout/IPA ABV Histogram
+brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    ggplot(aes(x = ABV, color = style_strict)) +
+    geom_histogram() +
+    facet_wrap(~style_strict) +
+    xlab("ABV") +
+    ylab("Beer Count") +
+    ggtitle("ABV Histogram by Ale/Stout/IPA") +
+    theme_minimal()
+
+# Facet wrap abv_cat_num with normalized count by style
+brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    group_by(style_strict, abv_cat_num) %>%
+    summarise(count = n(), mean_abv = mean(ABV)) %>%
+    mutate(sum = sum(count), percent = count / sum) %>%
+    ggplot(aes(x = abv_cat_num, y = percent, fill = style_strict)) +
+    geom_histogram(stat = "identity", binwidth = 100) +
+    geom_text(aes(label = round(percent, 2)), stat = "identity", vjust = -1) +
+    facet_wrap(~style_strict) +
+    xlab("ABV Category") +
+    ylab("Normalized Beer Count") +
+    ggtitle("ABV Category by Style and Normalized Beer Count") +
+    theme_minimal()
+
+# Stouts/IPA ABV Histogram
+brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    filter(style_strict == "IPA" | style_strict == "Stout") %>%
+    ggplot(aes(x = ABV, color = style_strict)) +
+    geom_histogram() +
+    xlab("ABV") +
+    ylab("Beer Count") +
+    ggtitle("Stouts vs. IPA Histogram") +
+    theme_minimal()
+
+# Ale/Stout/IPA ABV Histogram
+brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    filter(style_strict == "IPA" |
+        style_strict == "Stout" |
+        style_strict == "Ale"
+    ) %>%
+    ggplot(aes(x = ABV, color = style_strict)) +
+    geom_histogram() +
+    xlab("ABV") +
+    ylab("Beer Count") +
+    ggtitle("ABV Histogram by Ale/Stout/IPA") +
+    theme_minimal()
+
+# IPA/Stout Normalized counts of mean ABV
+brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    filter(style_strict == "IPA" | style_strict == "Stout") %>%
+    group_by(style_strict, abv_cat_num) %>%
+    summarise(mean_abv = median(ABV), count = n()) %>%
+    mutate(sum = sum(count), percent = count / sum) %>%
+    ggplot(aes(x = mean_abv, y = percent, fill = style_strict)) +
+    geom_histogram(stat = "identity") +
+    xlab("Mean ABV") +
+    ylab("Normalized Count") +
+    ggtitle("Mean ABV of IPA/Sout by Normalized Count") +
+    theme_minimal()
+
+# Facet Grid of Style Count by ABV Cat vs IBU Cat
+brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    filter(!is.na(abv_cat_num) & !is.na(ibu_cat_num)) %>%
+    ggplot(aes(x = style_strict, fill = style_strict)) +
+    geom_bar() +
+    facet_grid(abv_cat_num~ibu_cat_num) +
+    xlab("IBU") +
+    ylab("ABV") +
+    ggtitle("Facet Grid of Style Count by ABV Cat vs IBU Cat") +
     theme_minimal()
 
 ```
