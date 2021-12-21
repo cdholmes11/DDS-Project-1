@@ -390,7 +390,7 @@ brew_beers_new %>%
     ggtitle("Utah - IBU vs. ABV") +
     theme_minimal()
 
-# Ale/Stout/IPA ABV Histogram
+# ABV Histogram facet wrap on style
 brew_beers_new %>%
     filter(!is.na(ABV) & !is.na(IBU)) %>%
     ggplot(aes(x = ABV, color = style_strict)) +
@@ -398,7 +398,7 @@ brew_beers_new %>%
     facet_wrap(~style_strict) +
     xlab("ABV") +
     ylab("Beer Count") +
-    ggtitle("ABV Histogram by Ale/Stout/IPA") +
+    ggtitle("ABV Histogram") +
     theme_minimal()
 
 # Facet wrap abv_cat_num with normalized count by style
