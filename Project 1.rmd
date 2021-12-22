@@ -111,10 +111,9 @@ brew_beers_new$ibu_cat_num <-
 ```{r}
 # Q1: How many breweries are present in each state?
 # Dataframe of Brewereies by State
-brew_beers_summary <- brew_beers_new %>%
+brew_beers_summary <- breweries %>%
     group_by(State) %>%
-    summarize(count = n()) %>%
-    as.data.frame()
+    summarize(count = n())
 brew_beers_summary$State <- str_remove_all(brew_beers_summary$State, " ") # nolint
 head(brew_beers_summary)
 view(brew_beers_summary)
