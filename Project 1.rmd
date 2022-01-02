@@ -282,10 +282,136 @@ brew_beers_new %>%
 # response to this question with any other methods or techniques you have
 # learned.  Creativity and alternative solutions are always encouraged.
 
+## IPA and Ale dataset
+ipa_ale_comp <-
+    brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    filter(style_strict == "Ale" | style_strict == "IPA")
+
+## Scatter plot of IBU vs. ABV
+ipa_ale_comp %>%
+    ggplot(aes(x = IBU, y = ABV, color = style_strict)) +
+    geom_point() +
+    xlab("IBU") +
+    ylab("ABV") +
+    ggtitle("Ale and IPA - IBU vs ABV") +
+    theme_minimal()
+
+## Variables
+set.seed(1)
+iterations <- 100
+numks <- 40
+split_perc <- .7
+ipa_ale_len <- dim(ipa_ale_comp)[1]
+
+master_acc <- matrix(nrow = iterations, ncol = numks)
+
+## For loop to find best K value 
+for (j in 1:iterations)
+{
+    trainIndices <- sample(seq(1, ipa_ale_len, 1), split_perc * ipa_ale_len)
+    train <- ipa_ale_comp[trainIndices, ]
+    test <- ipa_ale_comp[-trainIndices, ]
+    for (i in 1:numks) {
+        classifications <- knn(train[, 3:4], test[, 3:4],
+            train$style_strict, prob = TRUE, k = i)
+        table(classifications, test$style_strict)
+        cm <- confusionMatrix(table(classifications, test$style_strict))
+        masterAcc[j, i] <- cm$overall[1]
+    }
+}
+
+mean_acc <- as.data.frame(colMeans(master_acc))
+colnames(MeanAcc) <- c("master_acc")
+bestknn <- which.max(mean_acc$master_acc)
+## Best K value is 7
+
+classifications <- knn(train[, 3:4], test[, 3:4], train$style_strict,
+    prob = TRUE, k = bestknn)
+table(classifications, test$style_strict)
+cm <- confusionMatrix(table(classifications, test$style_strict))
+cm
+## With K value 7
+## Accuracy 81.52%
+## Sensitivity 84.40%
+## Specificity 75.51% 
+
 # Q9: Knock their socks off!  Find one other useful inference from the data
 # that you feel Budweiser may be able to find value in.  You must convince
 # them why it is important and back up your conviction with appropriate
 # statistical evidence.
+
+### Percent IPA vs Ale at given IBU and ABV thresholds.
+ipa_ale_comp %>%
+    filter(IBU < 50 & ABV < 0.06) %>%
+    group_by(style_strict) %>%
+    summarise(count = n()) %>%
+    mutate(percent_of_total = count / sum(count))
+
+ipa_ale_comp %>%
+    filter(IBU >= 50 & ABV >= 0.06) %>%
+    group_by(style_strict) %>%
+    summarise(count = n()) %>%
+    mutate(percent_of_total = count / sum(count))
+
+### State data frame
+state_df <-
+    ipa_ale_comp %>%
+    group_by(State) %>%
+    summarise(count = n()) %>%
+    mutate(sum = sum(count), total_percent = (count / sum) * 100) %>%
+    select(State, total_percent)
+
+state_df %>%
+    ggplot(aes(x = reorder(State, -total_percent), y = total_percent)) +
+    geom_bar(stat = "identity")
+
+### Upper threshold of Ales
+ale_upper <- ipa_ale_comp %>%
+    filter(IBU >= 50 & ABV >= 0.06) %>%
+    filter(style_strict == "Ale")
+
+ale_upper_percent <-
+    ale_upper %>%
+    group_by(State) %>%
+    summarise(count = n()) %>%
+    mutate(sum = sum(count), upper_ale_percent = (count / sum) * 100) %>%
+    select(State, upper_ale_percent)
+
+### Lower threshold of IPAs
+ipa_lower <- ipa_ale_comp %>%
+    filter(IBU < 50 & ABV < 0.06) %>%
+    filter(style_strict == "IPA")
+
+ipa_upper_percent <-
+    ipa_lower %>%
+    group_by(State) %>%
+    summarise(count = n()) %>%
+    mutate(sum = sum(count), lower_ipa_percent = (count / sum) * 100) %>%
+    select(State, lower_ipa_percent)
+
+state_df_perc <- left_join(state_df, ale_upper_percent)
+state_df_perc <- left_join(state_df_perc, ipa_upper_percent)
+
+### Upper Ale threshold state breakdown
+state_df_perc %>%
+    mutate(ale_dif = upper_ale_percent - total_percent) %>%
+    ggplot(aes(x = reorder(State, -ale_dif), y = ale_dif)) +
+    geom_bar(stat = "identity", fill = "#ce3c3c") +
+    xlab("State") +
+    ylab("Difference from Percent Total") +
+    ggtitle("State High ABV/IBU Ale Representation") +
+    theme_minimal()
+
+### Lower IPA threshold state breakdown
+state_df_perc %>%
+    mutate(ipa_dif = lower_ipa_percent - total_percent) %>%
+    ggplot(aes(x = reorder(State, -ipa_dif), y = ipa_dif)) +
+    geom_bar(stat = "identity", fill = "#44a149") +
+    xlab("State") +
+    ylab("Difference from Percent Total") +
+    ggtitle("State High ABV/IBU IPA Representation") +
+    theme_minimal()
 ```
 
 # EDA
@@ -521,46 +647,4 @@ style_df_ba
 view(style_df_ba)
 # Write to csv
 write.csv(style_df_ba, file = "ba_style_guide.csv")
-```
-
-#knn
-```{r}
-ipa_ale_comp <- brew_beers_new %>% filter(style_strict == "Ale" | style_strict == "IPA") %>%
-filter(!is.na(ABV) & !is.na(IBU))
-```
-
-#knn loop
-```{r}
-set.seed(1)
-iterations = 100
-numks = 40
-splitPerc = .7
-ipa_ale_len = dim(ipa_ale_comp)[1]
-
-masterAcc = matrix(nrow = iterations, ncol = numks)
-
-for(j in 1:iterations)
-{
-  trainIndices = sample(seq(1,ipa_ale_len,1), splitPerc * ipa_ale_len)
-  train = ipa_ale_comp[trainIndices,]
-  test = ipa_ale_comp[-trainIndices,]
-  for(i in 1:numks)
-  {
-    classifications = knn(train[c(3,4)],test[c(3,4)],train$style_strict, prob = TRUE, k = i)
-    table(classifications,test$style_strict)
-    CM = confusionMatrix(table(classifications,test$style_strict))
-    masterAcc[j,i] = CM$overall[1]
-  }
-  
-}
-
-MeanAcc = as.data.frame(colMeans(masterAcc))
-colnames(MeanAcc) = c("masterAcc")
-bestknn = which.max(MeanAcc$masterAcc)
-max(MeanAcc)
-
-classifications = knn(train[,3:4],test[,3:4],train$style_strict, prob = TRUE, k = bestknn)
-table(classifications,test$style_strict)
-CM = confusionMatrix(table(classifications,test$style_strict))
-CM
 ```
