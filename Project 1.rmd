@@ -15,6 +15,9 @@ library(dplyr)
 library(rvest)
 library(xml2)
 library(scico)
+library(caret)
+library(e1071)
+library(class)
 ```
 
 # Variables
@@ -68,8 +71,6 @@ brew_beers_new <-
     )
 head(brew_beers_new)
 view(brew_beers_new)
-
-brew_beers_new$stand_style_count <- scale(length(brew_beers_new$style_strict))
 
 ## Checking for major styles still in "Other"
 brew_beers_new %>%
@@ -520,4 +521,46 @@ style_df_ba
 view(style_df_ba)
 # Write to csv
 write.csv(style_df_ba, file = "ba_style_guide.csv")
+```
+
+#knn
+```{r}
+ipa_ale_comp <- brew_beers_new %>% filter(style_strict == "Ale" | style_strict == "IPA") %>%
+filter(!is.na(ABV) & !is.na(IBU))
+```
+
+#knn loop
+```{r}
+set.seed(1)
+iterations = 100
+numks = 40
+splitPerc = .7
+ipa_ale_len = dim(ipa_ale_comp)[1]
+
+masterAcc = matrix(nrow = iterations, ncol = numks)
+
+for(j in 1:iterations)
+{
+  trainIndices = sample(seq(1,ipa_ale_len,1), splitPerc * ipa_ale_len)
+  train = ipa_ale_comp[trainIndices,]
+  test = ipa_ale_comp[-trainIndices,]
+  for(i in 1:numks)
+  {
+    classifications = knn(train[c(3,4)],test[c(3,4)],train$style_strict, prob = TRUE, k = i)
+    table(classifications,test$style_strict)
+    CM = confusionMatrix(table(classifications,test$style_strict))
+    masterAcc[j,i] = CM$overall[1]
+  }
+  
+}
+
+MeanAcc = as.data.frame(colMeans(masterAcc))
+colnames(MeanAcc) = c("masterAcc")
+bestknn = which.max(MeanAcc$masterAcc)
+max(MeanAcc)
+
+classifications = knn(train[,3:4],test[,3:4],train$style_strict, prob = TRUE, k = bestknn)
+table(classifications,test$style_strict)
+CM = confusionMatrix(table(classifications,test$style_strict))
+CM
 ```
