@@ -1,7 +1,7 @@
 ---
 title: "DDS Project 1"
-author: "CDHolmes"
-date: "12/15/2021"
+author: "CDHolmes & MPatel"
+date: "1/1/2022"
 output: html_document
 ---
 
@@ -18,6 +18,7 @@ library(scico)
 library(caret)
 library(e1071)
 library(class)
+library(robotstxt)
 ```
 
 # Variables
@@ -199,6 +200,7 @@ brew_beers_new %>%
     filter(!is.na(ABV)) %>%
     summarize(max_abv = max(ABV)) %>%
     slice_max(max_abv, n = 1)
+### Colorado makes the beer with the greatest ABV at 12.8%.
 
 ## Max IBU State
 brew_beers_new %>%
@@ -206,12 +208,16 @@ brew_beers_new %>%
     filter(!is.na(IBU)) %>%
     summarize(max_ibu = max(IBU)) %>%
     slice_max(max_ibu, n = 1)
+### Oregon makes the beer with the greatest IBU at 138.
 
 # Q6: Comment on the summary statistics and distribution of the ABV variable.
 brew_beers_new %>%
     select(ABV) %>%
     filter(!is.na(ABV)) %>%
     summary(ABV)
+
+## While ABV has a large range, 50% of beers fall between 5.0% and 6.7%
+## Its distribution is close to normal but is slightly right skewed.
 
 ## ABV Boxplot
 brew_beers_new %>%
@@ -306,9 +312,8 @@ ipa_ale_len <- dim(ipa_ale_comp)[1]
 
 master_acc <- matrix(nrow = iterations, ncol = numks)
 
-## For loop to find best K value 
-for (j in 1:iterations)
-{
+## For loop to find best K value
+for (j in 1:iterations) {
     trainIndices <- sample(seq(1, ipa_ale_len, 1), split_perc * ipa_ale_len)
     train <- ipa_ale_comp[trainIndices, ]
     test <- ipa_ale_comp[-trainIndices, ]
@@ -317,12 +322,12 @@ for (j in 1:iterations)
             train$style_strict, prob = TRUE, k = i)
         table(classifications, test$style_strict)
         cm <- confusionMatrix(table(classifications, test$style_strict))
-        masterAcc[j, i] <- cm$overall[1]
+        master_acc[j, i] <- cm$overall[1]
     }
 }
 
 mean_acc <- as.data.frame(colMeans(master_acc))
-colnames(MeanAcc) <- c("master_acc")
+colnames(mean_acc) <- c("master_acc")
 bestknn <- which.max(mean_acc$master_acc)
 ## Best K value is 7
 
@@ -332,9 +337,9 @@ table(classifications, test$style_strict)
 cm <- confusionMatrix(table(classifications, test$style_strict))
 cm
 ## With K value 7
-## Accuracy 81.52%
-## Sensitivity 84.40%
-## Specificity 75.51% 
+## Accuracy - 81.52%
+## Sensitivity - 84.40%
+## Specificity - 75.51%
 
 # Q9: Knock their socks off!  Find one other useful inference from the data
 # that you feel Budweiser may be able to find value in.  You must convince
@@ -400,7 +405,7 @@ state_df_perc %>%
     geom_bar(stat = "identity", fill = "#ce3c3c") +
     xlab("State") +
     ylab("Difference from Percent Total") +
-    ggtitle("State High ABV/IBU Ale Representation") +
+    ggtitle("Where to Sell High ABV/IBU Ales") +
     theme_minimal()
 
 ### Lower IPA threshold state breakdown
@@ -410,7 +415,7 @@ state_df_perc %>%
     geom_bar(stat = "identity", fill = "#44a149") +
     xlab("State") +
     ylab("Difference from Percent Total") +
-    ggtitle("State High ABV/IBU IPA Representation") +
+    ggtitle("Where to Sell Low ABV/IBU IPAs") +
     theme_minimal()
 ```
 
@@ -444,8 +449,6 @@ brew_beers_new %>%
     xlab("IBU Category") +
     ggtitle("IBU Category by ABV Facet Wrap and Style") +
     theme_minimal()
-
-
 
 brew_beers_new %>%
     filter(!is.na(ibu_cat) & !is.na(abv_cat)) %>%
@@ -645,6 +648,4 @@ for (i in 1:style_length) {
 style_df_ba <- style_df_ba[, c(2, 1)]
 style_df_ba
 view(style_df_ba)
-# Write to csv
-write.csv(style_df_ba, file = "ba_style_guide.csv")
 ```
