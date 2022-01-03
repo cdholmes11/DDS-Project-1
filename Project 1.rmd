@@ -3,6 +3,12 @@ title: "DDS Project 1"
 author: "CDHolmes & MPatel"
 date: "1/1/2022"
 output: html_document
+
+Introduction: Below are the findings related to the Beer and Breweries datasets.
+We have cleaned and organized the data and performed a thorough EDA.
+
+Our findings are organized into the provided questions followed by additional
+analysis that we found interesting and of potential use to Budweiser.
 ---
 
 # Libraries
