@@ -371,8 +371,9 @@ ipa_ale_comp <-
 
 ## Scatter plot of IBU vs. ABV
 ipa_ale_comp %>%
-    ggplot(aes(x = IBU, y = ABV, color = style_strict)) +
-    geom_point() +
+    ggplot(aes(x = IBU, y = ABV)) +
+    geom_point(aes(color = style_strict)) +
+    geom_smooth(method = "lm") +
     xlab("IBU") +
     ylab("ABV") +
     ggtitle("Ale and IPA - IBU vs ABV") +
@@ -447,6 +448,7 @@ state_df <-
 state_df %>%
     ggplot(aes(x = reorder(State, -total_percent), y = total_percent)) +
     geom_bar(stat = "identity", fill = "#ff8270") +
+    geom_text(aes(label = round(total_percent, 2)), stat = "identity", vjust = -1) +
     xlab("State") +
     ylab("Percent of Total") +
     ggtitle("State Percentage Share of Ales and IPA Production") +
@@ -535,7 +537,8 @@ brew_beers_new %>%
     geom_point(aes(color = style_strict)) +
     geom_smooth(method = "lm") +
     facet_wrap(~style_strict) +
-    ggtitle("ABV vs IBU - Style Facet Wrap")
+    ggtitle("ABV vs IBU - Style Facet Wrap") +
+    theme_minimal()
 
 # Top style by state
 ## Creating dataframe grouped by State and style_strict
