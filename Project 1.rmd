@@ -43,6 +43,61 @@ dim(beers)
 dim(breweries)
 ```
 
+
+# Beer Advocate Styles
+```{r}
+# These styles are used as an independent resource to categorise beers into
+# more strict style groups.
+
+# Beer Advocate Styles
+beer_advocate_styles <- "https://www.beeradvocate.com/beer/styles/"
+## Check scraping permissions
+paths_allowed(paths = c(beer_advocate_styles))
+
+# Return Data
+beer_advocate <- read_html(beer_advocate_styles)
+
+# Get Style Family Length for for loop
+style_family_length <-
+    beer_advocate %>%
+    html_nodes("#ba-content b") %>%
+    html_text2()
+style_family_length
+style_length <- length(style_family_length)
+
+# Blank dataframe for for loop
+style_df_ba <- data.frame(style = c(), style_family = c())
+
+# Retrieve Style Family and Style then create data frame from list
+for (i in 1:style_length) {
+    # Pull each Style Family y
+    style_family_node <- paste0(".stylebreak:nth-child(", i, ") b")
+    style_family <-
+        beer_advocate %>%
+        html_nodes(style_family_node) %>%
+        html_text2
+    style_family
+
+    # Pull each Style and convert to dataframe
+    style_node <- paste0("#ba-content .stylebreak:nth-child(", i, ") li")
+    style <-
+        beer_advocate %>%
+        html_nodes(style_node) %>%
+        html_text2()
+
+    style_df <- as.data.frame(style)
+    # Assign Style family to each line of data frame
+    style_df$style_family <- style_family
+    # Append data frame onto final style dataframe
+    style_df_ba <- rbind(style_df_ba, style_df)
+}
+
+# Reorder dataframe
+style_df_ba <- style_df_ba[, c(2, 1)]
+style_df_ba
+view(style_df_ba)
+```
+
 # Transform Data
 ```{r}
 # Merge Breweries and Beers into one data frame
@@ -70,19 +125,20 @@ brew_beers_new <-
             ignore.case = TRUE), "Wheat Beer",
         ifelse(grepl("Bock", Style, ignore.case = TRUE), "Bock", "Other")))))))
     )
-head(brew_beers_new)
-view(brew_beers_new)
 
-## Checking for major styles still in "Other"
+## Checking how many beers are in each style
 brew_beers_new %>%
     group_by(style_strict) %>%
     summarize(count = n())
 
-view(brew_beers_new %>%
+## Checking for major styles still in "Other"
+view(
+    brew_beers_new %>%
     select(style_strict, Style, beer_name) %>%
     filter(style_strict == "Other") %>%
     group_by(Style) %>%
-    summarize(count = n()))
+    summarize(count = n())
+)
 
 # IBU Range
 min_ibu <- min(brew_beers_new$IBU, na.rm = TRUE)
@@ -105,13 +161,13 @@ brew_beers_new$ibu_cat <-
     cut(brew_beers_new$IBU, breaks = ibu_seq)
 brew_beers_new$ibu_cat_num <-
     cut(brew_beers_new$IBU, breaks = ibu_seq, labels = c(1, 2, 3, 4, 5))
+# ABV and IBU Category summaries
+summary(brew_beers_new[, 12:15])
 ```
 
-
-
 # Ruberic Questions
-```{r}
 # Q1: How many breweries are present in each state?
+```{r}
 # Dataframe of Brewereies by State
 brew_beers_summary <- breweries %>%
     group_by(State) %>%
@@ -122,8 +178,8 @@ view(brew_beers_summary)
 
 # Bar Chart of Breweries by State
 brew_beers_summary %>%
-    ggplot(aes(x = reorder(State, -count), y = count, fill = State)) +
-    geom_bar(stat = "identity") +
+    ggplot(aes(x = reorder(State, -count), y = count)) +
+    geom_bar(stat = "identity", fill = "#ffd140") +
     geom_text(aes(label = count), stat = "identity", vjust = -1) +
     xlab("State") +
     ylab("Count") +
@@ -131,22 +187,48 @@ brew_beers_summary %>%
     theme_minimal() +
     theme(legend.position = "none")
 
+# Map of Breweries by State
+map_brews <- left_join(mapdata, brew_beers_summary)
+head(map_brews)
+map_brews[5000, ] # testing random line
+
+map_brews %>%
+    ggplot(aes(long, lat, group = subregion)) +
+    geom_map(
+        aes(map_id = region),
+        map = mapdata,
+        color = "gray80", fill = "gray 30", size = 0.3
+    ) +
+    coord_map("ortho", orientation = c(39, -98, 0)) +
+    geom_polygon(aes(group = group, fill = count), color = "black") +
+    ggtitle("State Heat Map - Brewery Count") +
+    scale_fill_scico(palette = "lajolla") +
+    theme_minimal()
+```
+
 # Q2: Merge beer data with the breweries data. Print the first 6 observations
 # and the last six observations to check the merged file.  (RMD only, this does
 # not need to be included in the presentation or the deck.)
+```{r}
+# See Transform section for merge.
 
-## See Transform section for merge.
-
+# First six rows
 view(head(brew_beers, 6))
+
+# Last six rows
 view(tail(brew_beers, 6))
+```
 
 # Q3: Address the missing values in each column.
+```{r}
+# Missing values will be removed for ABV, IBU, and Styles as needed.
 colSums(is.na(brew_beers_new) | brew_beers_new == "")
-## Missing values will be removed for ABV, IBU, and Styles as needed.
+```
 
 # Q4: Compute the median alcohol content and international bitterness unit for
 # each state. Plot a bar chart to compare.
-## Median ABV
+```{r}
+# Median ABV
 median_state_abv <-
     brew_beers_new %>%
     filter(!is.na(ABV)) %>%
@@ -158,9 +240,9 @@ median_state_abv
 median_state_abv %>%
     ggplot(aes(
             x = reorder(State, -median_abv),
-            y = median_abv * 100, fill = State)
+            y = median_abv * 100)
     ) +
-    geom_bar(stat = "identity") +
+    geom_bar(stat = "identity", fill = "#2a5769") +
     geom_text(aes(label = median_abv * 100),
         stat = "identity", vjust = -1, size = 3) +
     xlab("State") +
@@ -169,7 +251,7 @@ median_state_abv %>%
     theme_minimal() +
     theme(legend.position = "none")
 
-## Median IBU
+# Median IBU
 median_state_ibu <-
     brew_beers_new %>%
     filter(!is.na(IBU)) %>%
@@ -181,9 +263,9 @@ median_state_ibu
 median_state_ibu %>%
     ggplot(aes(
             x = reorder(State, -median_ibu),
-            y = median_ibu, fill = State
+            y = median_ibu
         )) +
-    geom_bar(stat = "identity") +
+    geom_bar(stat = "identity", fill = "#93b3be") +
     geom_text(aes(label = median_ibu),
         stat = "identity", vjust = -1, size = 3) +
     xlab("State") +
@@ -191,26 +273,31 @@ median_state_ibu %>%
     ggtitle("Median IBU by State") +
     theme_minimal() +
     theme(legend.position = "none")
+```
 
 # Q5: Which state has the maximum alcoholic (ABV) beer? Which state has the
 # most bitter (IBU) beer?
-## Max ABV State
+```{r}
+# Max ABV State
 brew_beers_new %>%
     group_by(State) %>%
     filter(!is.na(ABV)) %>%
     summarize(max_abv = max(ABV)) %>%
     slice_max(max_abv, n = 1)
-### Colorado makes the beer with the greatest ABV at 12.8%.
+## Colorado makes the beer with the greatest ABV at 12.8%.
 
-## Max IBU State
+# Max IBU State
 brew_beers_new %>%
     group_by(State) %>%
     filter(!is.na(IBU)) %>%
     summarize(max_ibu = max(IBU)) %>%
     slice_max(max_ibu, n = 1)
-### Oregon makes the beer with the greatest IBU at 138.
+## Oregon makes the beer with the greatest IBU at 138.
+```
 
 # Q6: Comment on the summary statistics and distribution of the ABV variable.
+```{r}
+# Summary statistics
 brew_beers_new %>%
     select(ABV) %>%
     filter(!is.na(ABV)) %>%
@@ -223,7 +310,7 @@ brew_beers_new %>%
 brew_beers_new %>%
     filter(!is.na(ABV)) %>%
     ggplot(aes(y = ABV)) +
-    geom_boxplot(fill = "#3a3aa5dc") +
+    geom_boxplot(fill = "#d8b135") +
     ylab("ABV") +
     ggtitle("ABV Boxplot") +
     theme_minimal()
@@ -232,50 +319,32 @@ brew_beers_new %>%
 brew_beers_new %>%
     filter(!is.na(ABV)) %>%
     ggplot(aes(x = ABV)) +
-    geom_histogram(fill = "#3a3aa5dc") +
+    geom_histogram(fill = "#d8b135") +
     xlab("ABV") +
     ylab("Count") +
     ggtitle("ABV Histogram") +
     theme_minimal()
+```
 
 # Q7: Is there an apparent relationship between the bitterness of the beer and
 # its alcoholic content? Draw a scatter plot.  Make your best judgment of a
 # relationship and EXPLAIN your answer.
+```{r}
+# ABV vs. IBU scatterplot with linear model
 brew_beers_new %>%
     filter(!is.na(ABV) & !is.na(IBU)) %>%
     ggplot(aes(x = ABV, y = IBU)) +
     geom_point() +
-    geom_smooth() +
+    geom_smooth(method = "lm", color = "#ff8270") +
     xlab("ABV") +
     ylab("IBU") +
     ggtitle("ABV vs. IBU") +
     theme_minimal()
 
-brew_beers_new %>%
-    filter(!is.na(ABV) & !is.na(IBU)) %>%
-    ggplot(aes(x = IBU, y = ABV)) +
-    geom_point() +
-    geom_smooth() +
-    xlab("IBU") +
-    ylab("ABV") +
-    ggtitle("IBU vs. ABV") +
-    theme_minimal()
-
-## Restrictin ABV between Q1-Q3
-brew_beers_new %>%
-    filter(!is.na(ABV) & !is.na(IBU)) %>%
-    filter(between(ABV, .05, .067)) %>%
-    ggplot(aes(x = ABV, y = IBU)) +
-    geom_point() +
-    geom_smooth() +
-    xlab("ABV") +
-    ylab("IBU") +
-    ggtitle("IBU vs. ABV Limited to ABV: Q1-Q3") +
-    theme_minimal()
-
-## It appears there is a fairly tight positive relationship bewtween the 1st
+## It appears there is a fairly tight positive relationship between the 1st
 ## and 3rd Quartile of ABV. The relationship weakens greatly towards the upper
 ## and lower limits of ABV
+```
 
 # Q8: Budweiser would also like to investigate the difference with respect to
 # IBU and ABV between IPAs (India Pale Ales) and other types of Ale
@@ -287,7 +356,7 @@ brew_beers_new %>%
 # relationship (KNN is required) you may also feel free to supplement your
 # response to this question with any other methods or techniques you have
 # learned.  Creativity and alternative solutions are always encouraged.
-
+```{r}
 ## IPA and Ale dataset
 ipa_ale_comp <-
     brew_beers_new %>%
@@ -314,9 +383,9 @@ master_acc <- matrix(nrow = iterations, ncol = numks)
 
 ## For loop to find best K value
 for (j in 1:iterations) {
-    trainIndices <- sample(seq(1, ipa_ale_len, 1), split_perc * ipa_ale_len)
-    train <- ipa_ale_comp[trainIndices, ]
-    test <- ipa_ale_comp[-trainIndices, ]
+    train_indices <- sample(seq(1, ipa_ale_len, 1), split_perc * ipa_ale_len)
+    train <- ipa_ale_comp[train_indices, ]
+    test <- ipa_ale_comp[-train_indices, ]
     for (i in 1:numks) {
         classifications <- knn(train[, 3:4], test[, 3:4],
             train$style_strict, prob = TRUE, k = i)
@@ -329,6 +398,7 @@ for (j in 1:iterations) {
 mean_acc <- as.data.frame(colMeans(master_acc))
 colnames(mean_acc) <- c("master_acc")
 bestknn <- which.max(mean_acc$master_acc)
+bestknn
 ## Best K value is 7
 
 classifications <- knn(train[, 3:4], test[, 3:4], train$style_strict,
@@ -336,17 +406,18 @@ classifications <- knn(train[, 3:4], test[, 3:4], train$style_strict,
 table(classifications, test$style_strict)
 cm <- confusionMatrix(table(classifications, test$style_strict))
 cm
-## With K value 7
-## Accuracy - 81.52%
-## Sensitivity - 84.40%
-## Specificity - 75.51%
+## With K value 7 and 'Positive' Class: Ale
+## Accuracy - 86.47%
+## Sensitivity - 89.89%
+## Specificity - 80.87%
+```
 
 # Q9: Knock their socks off!  Find one other useful inference from the data
 # that you feel Budweiser may be able to find value in.  You must convince
 # them why it is important and back up your conviction with appropriate
 # statistical evidence.
-
-### Percent IPA vs Ale at given IBU and ABV thresholds.
+```{r}
+# Percent IPA vs Ale at given IBU and ABV thresholds.
 ipa_ale_comp %>%
     filter(IBU < 50 & ABV < 0.06) %>%
     group_by(style_strict) %>%
@@ -359,7 +430,7 @@ ipa_ale_comp %>%
     summarise(count = n()) %>%
     mutate(percent_of_total = count / sum(count))
 
-### State data frame
+# State data frame
 state_df <-
     ipa_ale_comp %>%
     group_by(State) %>%
@@ -369,9 +440,13 @@ state_df <-
 
 state_df %>%
     ggplot(aes(x = reorder(State, -total_percent), y = total_percent)) +
-    geom_bar(stat = "identity")
+    geom_bar(stat = "identity", fill = "#ff8270") +
+    xlab("State") +
+    ylab("Percent of Total") +
+    ggtitle("State Percentage Share of Ales and IPA Production") +
+    theme_minimal()
 
-### Upper threshold of Ales
+# Upper threshold of Ales
 ale_upper <- ipa_ale_comp %>%
     filter(IBU >= 50 & ABV >= 0.06) %>%
     filter(style_strict == "Ale")
@@ -383,7 +458,7 @@ ale_upper_percent <-
     mutate(sum = sum(count), upper_ale_percent = (count / sum) * 100) %>%
     select(State, upper_ale_percent)
 
-### Lower threshold of IPAs
+# Lower threshold of IPAs
 ipa_lower <- ipa_ale_comp %>%
     filter(IBU < 50 & ABV < 0.06) %>%
     filter(style_strict == "IPA")
@@ -398,21 +473,21 @@ ipa_upper_percent <-
 state_df_perc <- left_join(state_df, ale_upper_percent)
 state_df_perc <- left_join(state_df_perc, ipa_upper_percent)
 
-### Upper Ale threshold state breakdown
+# Upper Ale threshold state breakdown
 state_df_perc %>%
     mutate(ale_dif = upper_ale_percent - total_percent) %>%
     ggplot(aes(x = reorder(State, -ale_dif), y = ale_dif)) +
-    geom_bar(stat = "identity", fill = "#ce3c3c") +
+    geom_bar(stat = "identity", fill = "#f8766d") +
     xlab("State") +
     ylab("Difference from Percent Total") +
     ggtitle("Where to Sell High ABV/IBU Ales") +
     theme_minimal()
 
-### Lower IPA threshold state breakdown
+# Lower IPA threshold state breakdown
 state_df_perc %>%
     mutate(ipa_dif = lower_ipa_percent - total_percent) %>%
     ggplot(aes(x = reorder(State, -ipa_dif), y = ipa_dif)) +
-    geom_bar(stat = "identity", fill = "#44a149") +
+    geom_bar(stat = "identity", fill = "#00bfc4") +
     xlab("State") +
     ylab("Difference from Percent Total") +
     ggtitle("Where to Sell Low ABV/IBU IPAs") +
@@ -421,26 +496,19 @@ state_df_perc %>%
 
 # EDA
 ```{r}
-
-# Map of Breweries by State
-map_brews <- left_join(mapdata, brew_beers_summary)
-head(map_brews)
-map_brews[5000, ] # testing random line
-
-map_brews %>%
-    ggplot(aes(long, lat, group = subregion)) +
-    geom_map(
-        aes(map_id = region),
-        map = mapdata,
-        color = "gray80", fill = "gray 30", size = 0.3
-    ) +
-    coord_map("ortho", orientation = c(39, -98, 0)) +
-    geom_polygon(aes(group = group, fill = count), color = "black") +
-    ggtitle("State Heat Map - Brewery Count") +
-    scale_fill_scico(palette = "bilbao") +
+# ABV and IBU relationship when restricting ABV between Q1-Q3
+brew_beers_new %>%
+    filter(!is.na(ABV) & !is.na(IBU)) %>%
+    filter(between(ABV, .05, .067)) %>%
+    ggplot(aes(x = ABV, y = IBU)) +
+    geom_point() +
+    geom_smooth(method = "lm", color = "#ff8270") +
+    xlab("ABV") +
+    ylab("IBU") +
+    ggtitle("IBU vs. ABV Limited to ABV: Q1-Q3") +
     theme_minimal()
 
-# EDA
+# IBU categories with ABV categories facet wrap.
 brew_beers_new %>%
     filter(!is.na(ibu_cat) & !is.na(abv_cat)) %>%
     ggplot(aes(x = ibu_cat_num, fill = style_strict)) +
@@ -450,40 +518,27 @@ brew_beers_new %>%
     ggtitle("IBU Category by ABV Facet Wrap and Style") +
     theme_minimal()
 
-brew_beers_new %>%
-    filter(!is.na(ibu_cat) & !is.na(abv_cat)) %>%
-    ggplot(aes(x = ABV, y = IBU)) +
-    geom_point() +
-    facet_grid(abv_cat_num~ibu_cat_num) +
-    xlab("ABV Cat") +
-    ylab("IBU Cat")
-# Beer count has a positive relation with ABV and IBU until category 2 of ABV
-# It appears that at higher ABVs there is a negative coorelation between ABV
-# and IBU
+## Beer count has a positive relation with ABV and IBU until category 2 of ABV
+## It appears that at higher ABVs there is a negative coorelation between ABV
+## and IBU
 
-## ABV vs. IBU by Style
+# ABV vs. IBU by Style
 brew_beers_new %>%
     filter(!is.na(ibu_cat) & !is.na(abv_cat)) %>%
     ggplot(aes(x = ABV, y = IBU)) +
     geom_point(aes(color = style_strict)) +
-    geom_smooth() +
+    geom_smooth(method = "lm") +
     facet_wrap(~style_strict) +
     ggtitle("ABV vs IBU - Style Facet Wrap")
 
-brew_beers_new %>%
-    filter(!is.na(ibu_cat) & !is.na(abv_cat)) %>%
-    ggplot(aes(x = IBU, y = ABV)) +
-    geom_point(aes(color = style_strict)) +
-    geom_smooth() +
-    facet_wrap(~style_strict) +
-    ggtitle("IBU vs ABV - Style Facet Wrap")
-
-## Top style by State
+# Top style by state
+## Creating dataframe grouped by State and style_strict
 top_beer <- brew_beers_new %>%
     filter(!is.na(ibu_cat) & !is.na(abv_cat)) %>%
     group_by(State, style_strict) %>%
     summarize(count = n())
 
+## Beer styles by state bar chart
 top_beer %>%
     ggplot(aes(x = reorder(State, -count), y = count, fill = style_strict)) +
     geom_bar(stat = "identity") +
@@ -492,9 +547,11 @@ top_beer %>%
     ggtitle("Beer Styles by State") +
     theme_minimal()
 
+## Organizing data for viewing top style by state
 sorted_group <- top_beer[order(top_beer$State, -top_beer$count), ]
 top_style_by_state <- sorted_group[!duplicated(sorted_group$State), ]
 
+## Top style by state chart
 top_style_by_state %>%
     ggplot(aes(x = reorder(State, -count), y = count, fill = style_strict)) +
     geom_bar(stat = "identity") +
@@ -503,10 +560,10 @@ top_style_by_state %>%
     ggtitle("Top Style by State") +
     theme_minimal()
 
+## Number of beers per style
 brew_beers_new %>%
     group_by(style_strict) %>%
     summarize(count = n())
-
 
 # Utah IBU vs. ABV scatter plot
 brew_beers_new %>%
@@ -598,54 +655,3 @@ brew_beers_new %>%
 
 ```
 
-
-# Beer Advocate Styles
-```{r}
-# Beer Advocate Styles
-beer_advocate_styles <- "https://www.beeradvocate.com/beer/styles/"
-## Check scraping permissions
-paths_allowed(paths = c(beer_advocate_styles))
-
-# Return Data
-beer_advocate <- read_html(beer_advocate_styles)
-
-# Get Style Family Length for for loop
-style_family_length <-
-    beer_advocate %>%
-    html_nodes("#ba-content b") %>%
-    html_text2()
-style_family_length
-style_length <- length(style_family_length)
-
-# Blank dataframe for for loop
-style_df_ba <- data.frame(style = c(), style_family = c())
-
-# Retrieve Style Family and Style then create data frame from list
-for (i in 1:style_length) {
-    # Pull each Style Family y
-    style_family_node <- paste0(".stylebreak:nth-child(", i, ") b")
-    style_family <-
-        beer_advocate %>%
-        html_nodes(style_family_node) %>%
-        html_text2
-    style_family
-
-    # Pull each Style and convert to dataframe
-    style_node <- paste0("#ba-content .stylebreak:nth-child(", i, ") li")
-    style <-
-        beer_advocate %>%
-        html_nodes(style_node) %>%
-        html_text2()
-
-    style_df <- as.data.frame(style)
-    # Assign Style family to each line of data frame
-    style_df$style_family <- style_family
-    # Append data frame onto final style dataframe
-    style_df_ba <- rbind(style_df_ba, style_df)
-}
-
-# Reorder dataframe
-style_df_ba <- style_df_ba[, c(2, 1)]
-style_df_ba
-view(style_df_ba)
-```
